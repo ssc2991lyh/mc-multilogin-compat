@@ -98,7 +98,7 @@ MC 服  MCMultiLoginCompat（本插件，load: STARTUP 尽早启用）
 ```bash
 # 需要 JDK 8+（产物目标字节码 Java 8，适配 1.8 ~ 最新 Purpur）
 ./gradlew build
-# 产物：build/libs/mc-multilogin-compat-bukkit-<version>.jar
+# 产物：build/libs/mc-multilogin-bukkit-<version>.jar
 ```
 
 将 JAR 放入服务端 `plugins/` 重启即可。首次运行自动生成
