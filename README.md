@@ -58,7 +58,8 @@ MC 服  MCMultiLoginCompat（本插件，load: STARTUP 尽早启用）
 
 ### `config.json`（自包含验证，仅 `method[]` 模式用）
 
-首次运行自动生成模板，关键结构：
+首次运行自动生成模板。为了**安全 fail-open**，默认 `method` 是**空数组**，
+插件不会接管登录；需要自包含验证时，手动填入至少一个 method。
 
 ```json
 {
@@ -79,8 +80,11 @@ MC 服  MCMultiLoginCompat（本插件，load: STARTUP 尽早启用）
 }
 ```
 
-`method[]` 是验证入口；`handles` 指明该入口允许哪些皮肤站。`secret` 用于
-认证服务回源校验。完整字段语义与原 Node 版 `MC-MultiLogin-service` 一致。
+- `method[]`：验证入口。空数组 = 不自包含验证。
+- `handles`：该入口允许哪些皮肤站（与上方 `apis[].id` 对应）。
+- `url` / `secret`：保留与原 Node 版 `MC-MultiLogin-service` 一致的字段语义，
+  合并进插件后主要作 method 标识与缓存分目录用。
+- 填好 `method[]` 后**重启**（或 `/multilogin reload`）即可启用自包含验证。
 
 ## 指令
 
