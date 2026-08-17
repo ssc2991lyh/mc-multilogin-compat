@@ -1,65 +1,94 @@
-# MCMultiLoginCompat
+# MCMultiLoginCompat（纯版）
 
-> Bukkit / Purpur 服务端的多账户正版登录兼容 + QQ 绑定验证码门禁插件。
+> Bukkit / Spigot / Paper / Purpur 服务端的多账户正版登录兼容插件。
 
 ## 项目简介
 
-这个项目解决了 bukkit 类服务器无法使正版验证与单/多个 Yggdrasil 平台同时验证登录、以及服务器恶意账号管理类的问题。该项目通过对内部校验机制进行修改，使其支持正版用户 + 多 api 验证用户进入的同时不必启用服务器离线模式、使用 QQ 号与玩家账号相绑定来预防批量恶意离线用户对服务器造成的损害等。
+让 bukkit 类服务器**同时支持正版玩家与多个 Yggdrasil（皮肤站）账号登录**，
+而**不需要开启离线模式**（`online-mode=false`）。适用于你想让 LittleSkin /
+自建 authlib-injector 玩家与正版玩家同服的场景。
 
-- **多账户登录兼容**：接管 `hasJoinedServer`，让正版玩家与接入 LittleSkin / 自建 Yggdrasil（authlib-injector）的玩家可同时进服，**无需开启离线模式**。
-- **QQ 绑定验证码门禁（mcverify）**：未验证玩家进服即被 `/kick`，踢出原因含「验证 XXXXXX」；玩家在绑定 QQ 群发送「验证 XXXXXX」后由 MC 服标记已验证，下次进服直接放行并收到「欢迎回来」。
+这是**纯版**：只包含「多账户登录兼容」核心能力，**不含** QQ 绑定验证码门禁
+（mcverify）。如果你还需要「进服验证码 + QQ 群放行」的门禁，请看联合版
+[`mc-multilogin-verify-plugin`](https://github.com/ssc2991lyh/mc-multilogin-verify-plugin)
+（内置 mcverify 转发能力）。
 
 ## 特性
 
-- 正版 + 多 Yggdrasil API 并存登录（自包含 `config.json`，无需外部 HTTP 服务）。
-- 进服自动生成验证码、踢出提示直达、已验证欢迎、群内进出服播报。
-- 验证状态（verify.json）**只保存在 MC 服本地**，适合 MC 服（Linux）与 AstrBot（Windows）跨机部署。
-- 两种 QQ 接码通道，按需选择：**OneBot 直连** 或 **AstrBot 插件转发**。
+- **接管 `hasJoinedServer`**：正版 + 多 Yggdrasil 并存登录，无需关闭在线验证。
+- **两种验证来源，任选其一（也可同时配）**：
+  - **外部模式**：对接你已有的 `MC-MultiLogin-service`（在 `config.yml` 填 `api-url`）。
+  - **自包含模式**：把验证逻辑直接内嵌进插件，靠 `config.json` 的 `method[]`
+    配置，**无需再起任何外部 HTTP 服务**。
+- **详细登录失败原因**：在 Netty 层拦截登录断开包，把原版笼统的
+  `Authentication servers are down` 替换为认证服务返回的真实原因
+  （名称重复 / 封禁 / 皮肤站不支持 / 登录过快等）。
+- **名称重复自动改名重试**：认证返回 `DUPLICATE_NAME` 时，自动用返回的可用名
+  重试一次，并把「原名 → 新名」记进 `renames.json`。
+- **单 JAR 全版本兼容**：产物目标字节码 Java 8，`api-version: 1.13`，
+  可在 1.8 ~ 最新 Purpur 上加载。
 
-## 架构（两套现成方案合并后的最终形态）
+## 工作原理
 
 ```
-MC 服 (Linux)  MCMultiLoginCompat (本插件)
-  ├─ 会话代理 / Netty 拦截：正版 + 多 Yggdrasil 登录兼容
-  ├─ VerifyGate：进服查 verify.json
-  │     ├─ 已验证 → 欢迎回来 + 进出服播报
-  │     └─ 未验证 → 生成码写 verify.json → 下一 tick /kick（原因含「验证 XXXXXX」）
-  ├─ verify.json：仅存在于 MC 服本地（插件数据目录）
-  └─ 验证入站（二选一，由 verifychannel 决定）
-        ├─ onebot  ：自带 HTTP 入站监听，接收 OneBot 群消息 webhook
-        └─ astrbot ：/multilogin verify <code> 指令（由 AstrBotAdapter 远程执行）
-
-QQ 群「验证 XXXXXX」
-  ├─ onebot 通道：OneBot 直接 webhook 推到 MC 服 → 标记 → OneBot 回群
-  └─ astrbot 通道：astrbot_plugin_mc_verify 收到 → 经 AstrBotAdapter command/execute
-                   → MC 服执行 /multilogin verify <code> → 标记 → 回调回群
+MC 服  MCMultiLoginCompat（本插件，load: STARTUP 尽早启用）
+  ├─ SessionServiceHook：动态代理包装 MinecraftSessionService，接管 hasJoinedServer
+  │     → 正版 / 多 Yggdrasil 玩家并行验证，均通过才放行
+  └─ LoginPipelineHook：Netty 登录通道注入
+        → 拦截「登录阶段断开包」，把笼统错误替换为认证服务的真实原因
 ```
 
-> mcverify（AstrBot 端）只做「转发 + 收回调」，**不写 json、不轮询、不冻结**，所有状态都在 MC 服。
+验证实际怎么跑（满足任一即接管登录，都不满足则安全 fail-open）：
 
-## 验证通道配置（verifyconfig.json）
+- `config.yml` 配置了 `api-url` → 走外部 `MC-MultiLogin-service`（HTTP 请求）。
+- `config.json` 有 `method[]` → 走内嵌 `VerifyService`（进程内，无需外部服务）。
+- 两者都没有 → 插件只注册指令、不接管登录（避免服主误以为在验证）。
 
-| 字段 | 说明 |
-| --- | --- |
-| `verifychannel` | `onebot` / `astrbot` / `both` |
-| `astrbottoken` | AstrBotAdapter 的 token（astrbot/both 用；留空则提示从 `plugins/AstrbotAdapter/config.yml` 复制） |
-| `onebot_http_url` | OneBot HTTP 地址（onebot/both 用） |
-| `onebot_token` | OneBot access_token（可为空） |
-| `verify_webhook_port` | OneBot 把群消息推到本插件的端口（onebot/both 用，默认 8766） |
+## 配置
 
-- `onebot` 时不读 `astrbottoken`；`astrbot` 时不读 `onebot_http_url` / `onebot_token`。
-- 其余开关（kick / 欢迎 / 播报等）均为 `true/false`，见 `verifyconfig.json` 默认模板。
+### `config.yml`（插件主配置）
 
-### AstrBot 端插件（astrbot 通道）
+| 字段 | 说明 | 默认 |
+| --- | --- | --- |
+| `api-url` | 外部 `MC-MultiLogin-service` 某登录方式基础地址（即其 `method[].url`）。留空则不挂钩外部服务 | 空 |
+| `auto-rename` | 认证返回 `DUPLICATE_NAME` 时，自动用返回的可用名重试一次并记入 `renames.json` | `true` |
+| `request-timeout-seconds` | 每次验证请求超时（秒） | `10` |
+| `shutdown-on-failure` | 会话代理安装失败时是否直接关闭服务器（宁可不开服也不裸奔） | `false` |
+| `debug` | 是否输出每次被拦截登录的额外日志（调试用） | `false` |
 
-仓库同级：`astrbot_plugin_mc_verify`（`minecraft-qq-whitelist/` 下）。需配置：
+### `config.json`（自包含验证，仅 `method[]` 模式用）
 
-| 字段 | 说明 |
-| --- | --- |
-| `mc_host` | AstrBotAdapter REST 地址（同机 127.0.0.1，否则 MC 服 IP） |
-| `mc_rest_port` | AstrBotAdapter 端口（默认 8765） |
-| `astrbottoken` | AstrBotAdapter 自动生成的 token |
-| `group_id` | 监听「验证 XXXX」的群号（留空=所有群） |
+首次运行自动生成模板，关键结构：
+
+```json
+{
+  "apis": [
+    { "id": "littleskin", "name": "LittleSkin", "root": "https://littleskin.cn/api/yggdrasil" },
+    { "id": "original", "name": "Official" }
+  ],
+  "default": "original",
+  "method": [
+    {
+      "url": "/login/my",
+      "name": "myserver",
+      "secret": "your_secret_key_here",
+      "handles": ["littleskin", "original"]
+    }
+  ],
+  "errorMessages": { "...": "..." }
+}
+```
+
+`method[]` 是验证入口；`handles` 指明该入口允许哪些皮肤站。`secret` 用于
+认证服务回源校验。完整字段语义与原 Node 版 `MC-MultiLogin-service` 一致。
+
+## 指令
+
+`/multilogin <status|reload|renames>`（别名 `mlogin` / `mml`，权限 `mcmultilogin.admin`，默认 OP）
+
+- `status`：查看会话代理 / Netty 注入状态与已配置验证来源。
+- `reload`：热重载 `config.yml` 与 `config.json`（会话代理本身不受影响）。
+- `renames`：查看「原名 → 新名」自动改名记录。
 
 ## 构建
 
@@ -69,10 +98,10 @@ QQ 群「验证 XXXXXX」
 # 产物：build/libs/mc-multilogin-compat-bukkit-<version>.jar
 ```
 
-将 JAR 放入服务端 `plugins/` 重启即可。首次运行自动生成 `config.yml` / `config.json` / `verifyconfig.json`。
+将 JAR 放入服务端 `plugins/` 重启即可。首次运行自动生成
+`config.yml` / `config.json` / `renames.json`。
 
 ## 开源协议
 
-本项目以 **GNU Affero General Public License v3.0 (AGPL-3.0)** 发布。详见 [LICENSE](./LICENSE)。
-
-配套自研的 `astrbot_plugin_mc_verify` 同样以 AGPL-3.0 发布。
+本项目以 **GNU Affero General Public License v3.0 (AGPL-3.0)** 发布，详见
+[LICENSE](./LICENSE)。
