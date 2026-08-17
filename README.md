@@ -1,4 +1,4 @@
-# MCMultiLoginCompat（纯版）
+# MCMultiLoginCompat
 
 > Bukkit / Spigot / Paper / Purpur 服务端的多账户正版登录兼容插件。
 
@@ -7,6 +7,8 @@
 让 bukkit 类服务器**同时支持正版玩家与多个 Yggdrasil（皮肤站）账号登录**，
 而**不需要开启离线模式**（`online-mode=false`）。适用于你想让 LittleSkin /
 自建 authlib-injector 玩家与正版玩家同服的场景。
+
+本项目移植于项目[`mc-multilogin-compat-mod`](https://github.com/wifi-left/mc-multilogin-compat-mod)，意在使Bukkit系服务器能够拥有同一能力。
 
 这是**纯版**：只包含「多账户登录兼容」核心能力，**不含** QQ 绑定验证码门禁
 （mcverify）。如果你还需要「进服验证码 + QQ 群放行」的门禁，请看联合版
@@ -17,7 +19,7 @@
 
 - **接管 `hasJoinedServer`**：正版 + 多 Yggdrasil 并存登录，无需关闭在线验证。
 - **两种验证来源，任选其一（也可同时配）**：
-  - **外部模式**：对接你已有的 `MC-MultiLogin-service`（在 `config.yml` 填 `api-url`）。
+  - **外部模式**：对接你已有的 [`MC-MultiLogin-service`](https://github.com/wifi-left/MC-MultiLogin-service)（在 `config.yml` 填 `api-url`）。
   - **自包含模式**：把验证逻辑直接内嵌进插件，靠 `config.json` 的 `method[]`
     配置，**无需再起任何外部 HTTP 服务**。
 - **详细登录失败原因**：在 Netty 层拦截登录断开包，把原版笼统的
