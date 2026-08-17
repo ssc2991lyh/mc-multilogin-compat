@@ -10,10 +10,7 @@
 
 本项目移植于项目[`mc-multilogin-compat-mod`](https://github.com/wifi-left/mc-multilogin-compat-mod)，意在使Bukkit系服务器能够拥有同一能力。
 
-这是**纯版**：只包含「多账户登录兼容」核心能力，**不含** QQ 绑定验证码门禁
-（mcverify）。如果你还需要「进服验证码 + QQ 群放行」的门禁，请看联合版
-[`mc-multilogin-verify-plugin`](https://github.com/ssc2991lyh/mc-multilogin-verify-plugin)
-（内置 mcverify 转发能力）。
+这是**纯版**：只包含「多账户登录兼容」核心能力。
 
 ## 特性
 

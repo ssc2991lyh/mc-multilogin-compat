@@ -41,7 +41,7 @@ public final class ServiceConfig {
             + "    \"method\": \"验证入口数组（自包含模式）。每项 {url,name,secret,handles}。空数组=安全 fail-open，插件不接管登录；handles 限定该入口允许的皮肤站。\",\n"
             + "    \"push\": \"{handles:{玩家名:皮肤站id}} 强制指定某玩家来自哪个皮肤站，覆盖自动探测。\",\n"
             + "    \"errorMessages\": \"自定义错误文案，cause→模板，支持 {from}/{name}/{availableId} 占位符。\",\n"
-            + "    \"verify_data_file\": \"共享验证状态文件名（落插件数据目录），默认 verify.json，供 mcverify 转发端读取。\",\n"
+            + "    \"verify_data_file\": \"共享验证状态文件名（落插件数据目录），默认 verify.json，记录自包含模式下的验证结果。\",\n"
             + "    \"cache_dir\": \"玩家验证缓存目录名（相对插件数据目录），每个 method 一个子目录。\"\n"
             + "  },\n"
             + "  \"log_remaining_number\": 5,\n"
